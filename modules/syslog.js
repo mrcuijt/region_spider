@@ -1,5 +1,5 @@
-
-var mongodb = require("./db"); // 引入数据库模块实例
+// var mongodb = require("./db"); // 引入数据库模块实例
+var mongodb_pool = require("./db_pool");
 var settings = require("./settings");
 
 function SysLog(obj){
@@ -20,20 +20,17 @@ SysLog.prototype.save = function(callback){
 		status : this.status,
 		errType : this.errType,
 	};
-	mongodb.connect('mongodb://'+settings.host+"/"+settings.db,function(err,db){
-		if(err){
-			// db.close();
-			return callback(err);
-		}
- 		var dbo = db.db(settings.db);
-		dbo.collection("syslog").insertOne(sysLog,function(err,res){
+	mongodb_pool.acquire().then(function(client){
+		let db = client.db(settings.db);
+		db.collection("syslog").insertOne(sysLog,function(err,res){
+			mongodb_pool.release(client);
 			if(err){
-				db.close();
 				return callback(err);
 			}
 			callback(err,res);
-			db.close();
 		});
+	},function(err){
+		console.log(err);
 	});
 
 }
@@ -41,25 +38,21 @@ SysLog.prototype.save = function(callback){
 SysLog.prototype.find = function(obj){
 	var promise = new Promise(function(resolve, reject) {
 		mongodb.connect('mongodb://'+settings.host+"/"+settings.db,function(err,db){
-			if(err){
-				// db.close();
-				return reject(err);
-			}
-			var dbo = db.db(settings.db);
-			dbo.collection("syslog").find(obj).toArray(function(err,res){
-				if(err){
-					console.log(err);
-					db.close();
-					return reject(err);
-				}
-				if(res && res.length > 0){
-					db.close();
-					return resolve(res);
-				}else{
-					db.close();
-					return reject({"msg":"结果集查询为0","res":res});
-				}
-				db.close();
+			mongodb_pool.acquire().then(function(client){
+				let db = client.db(settings.db);
+				db.collection("syslog").find(obj).toArray(function(err,res){
+					mongodb_pool.release(client);
+					if(err){
+						return reject(err);
+					}else if(res && res.length > 0){
+						return resolve(res);
+					}else{
+						return reject({"msg":"结果集查询为0","res":res});
+					}
+				});
+		
+			},function(err){
+				console.log(err);
 			});
 		});
 	});

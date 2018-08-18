@@ -3,7 +3,8 @@ const fs = require('fs');
 const cheerio = require('cheerio');
 const iconv = require('iconv-lite');
 const async = require('async');
-var mongodb = require("./modules/db"); // 引入数据库模块实例
+// var mongodb = require("./modules/db"); // 引入数据库模块实例
+var mongodb_pool = require("./modules/db_pool");
 var settings = require("./modules/settings");
 let request = require('request');
 let region = require("./modules/region");
@@ -17,25 +18,20 @@ let count = 1;
 function initRegions(obj){
 
 	let promise = new Promise(function(resolve,reject){
-
-		mongodb.connect('mongodb://'+settings.host+"/"+settings.db,function(err,db){
-			if(err){
-				db.close();
-				return reject(err);
-			}
-			var dbo = db.db(settings.db);
-			dbo.collection("regions").find(obj).toArray(function(err,res){
+		mongodb_pool.acquire().then(function(client){
+			let db = client.db(settings.db);
+			db.collection("regions").find(obj).toArray(function(err,res){
+				mongodb_pool.release(client);
 				if(err){
-					console.log(err);
 					return reject(err);
-				}
-				if(res && res.length > 0){
+				}else if(res && res.length > 0){
 					return resolve(res);
 				}else{
 					return reject({"msg":"结果集查询为0","res":res});
 				}
 			});
-			db.close();
+		},function(err){
+			console.log(err);
 		});
 
 	});
@@ -67,7 +63,7 @@ function main(){
 					return;
 				// add some items to the queue
 				q.push(item, asyncCallback);
-				//throw "";
+				// throw "";
 			});
 			}catch(e){
 				console.error(e);
@@ -82,7 +78,7 @@ function main(){
 
 function load(region){
 
-	if(!region || !region.url){
+	if(region || region.url){
 		return;
 	}
 

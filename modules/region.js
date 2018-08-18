@@ -2,7 +2,8 @@ const http = require('http')
 const fs = require('fs')
 const cheerio = require('cheerio')
 const iconv = require('iconv-lite')
-var mongodb = require("./db"); // 引入数据库模块实例
+var mongodb_pool = require("./db_pool");
+// var mongodb = require("./db"); // 引入数据库模块实例
 var settings = require("./settings");
 let request = require('request');
 
@@ -80,48 +81,41 @@ Region.prototype.save=function(callback){
 		url:this.url,
 		urlname:this.urlname
 	};
-	mongodb.connect('mongodb://'+settings.host+"/"+settings.db,function(err,db){
-		if(err){
-			// db.close(); // error 后 db 为 null
-			return callback(err);
-		}
- 		var dbo = db.db(settings.db);
-		dbo.collection("regions").insertOne(region,function(err,res){
+	mongodb_pool.acquire().then(function(client){
+
+		let db = client.db(settings.db);
+		db.collection("regions").insertOne(region,function(err,res){
+			mongodb_pool.release(client);
 			if(err){
-				db.close();
 				return callback(err);
 			}
 			callback(err,res);
-			db.close();
 		});
+	
+	},function(err){
+		console.log(err);
 	});
 }
 
 Region.prototype.findByCode = function(code,callback){
 
 	var promise = new Promise(function(resolve, reject) {
-		mongodb.connect('mongodb://'+settings.host+"/"+settings.db,function(err,db){
-			if(err){
-				// db.close();
-				return reject(err);
-			}
-			var dbo = db.db(settings.db);
-			dbo.collection("regions").find({"code":code}).toArray(function(err,res){
+
+		mongodb_pool.acquire().then(function(client){
+			let db = client.db(settings.db);
+			db.collection("regions").find({"code":code}).toArray(function(err,res){
+				mongodb_pool.release(client);
 				if(err){
-					console.log(err);
-					db.close();
 					return reject(err);
-				}
-				if(res && res.length > 0){
-					db.close();
+				}else if(res && res.length > 0){
 					return resolve(res);
 				}else{
-					db.close();
 					return reject({"msg":"结果集查询为0","res":res});
 				}
-				db.close();
 			});
-			// db.close();
+
+		},function(err){
+			console.log(err);
 		});
 	});
 	return promise;

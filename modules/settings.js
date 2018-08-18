@@ -1,6 +1,6 @@
 module.exports = {
     cookieSecret:"region",
-    db:"spiderv1",
+    db:"spider",
     host:"localhost",
-	port:27017
+    port:27017
 }
