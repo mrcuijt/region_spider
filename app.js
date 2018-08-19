@@ -59,8 +59,8 @@ function main(){
 			regions.forEach(function(item,index){
 
 				//console.log(index);
-				if(index == 0)
-					return;
+				//if(index == 1)
+				//	return;
 				// add some items to the queue
 				q.push(item, asyncCallback);
 				// throw "";
@@ -78,7 +78,7 @@ function main(){
 
 function load(region){
 
-	if(region || region.url){
+	if(!region || !region.url){
 		return;
 	}
 
@@ -411,9 +411,11 @@ function asyncCallback(err,regions){
 
 	if(regions){
 		regions.forEach(function(item,index){
-			q.push(item,function(err,regions){
-				asyncCallback(err,regions);
-			});
+			if(item.url){ // 减少任务队列中的任务数量
+				q.push(item,function(err,regions){
+					asyncCallback(err,regions);
+				});
+			}
 		});
 	}
 
